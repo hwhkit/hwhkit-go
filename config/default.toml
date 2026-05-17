@@ -1,0 +1,158 @@
+[server]
+bind_addr = "0.0.0.0:8080"
+read_timeout_ms = 10000
+write_timeout_ms = 30000
+idle_timeout_ms = 60000
+body_limit_bytes = 4194304
+drain_timeout_ms = 30000
+handler_timeout_ms = 30000
+
+[observability.log]
+level = "info"
+format = "json"
+
+[observability.metrics]
+enabled = true
+
+[observability.otel]
+enabled = false
+endpoint = "localhost:4317"
+service_name = "hwhkit-app"
+service_version = "dev"
+insecure = true
+
+[integrations.sql.postgres]
+enabled = false
+required = true
+url = ""
+max_connections = 10
+
+[integrations.sql.postgres.migrations]
+run_on_start = false
+path = "migrations"
+
+[integrations.sql.postgres.resilience]
+connect_timeout_ms = 5000
+op_timeout_ms = 10000
+probe_timeout_ms = 2000
+shutdown_timeout_ms = 5000
+
+[integrations.redis]
+enabled = false
+required = true
+url = ""
+pool_size = 10
+
+[integrations.redis.resilience]
+connect_timeout_ms = 5000
+op_timeout_ms = 5000
+probe_timeout_ms = 2000
+shutdown_timeout_ms = 5000
+
+[integrations.mongodb]
+enabled = false
+required = true
+uri = ""
+database = ""
+
+[integrations.mongodb.resilience]
+connect_timeout_ms = 10000
+op_timeout_ms = 10000
+probe_timeout_ms = 3000
+shutdown_timeout_ms = 5000
+
+[integrations.messaging.nats]
+enabled = false
+required = true
+url = ""
+jetstream = false
+
+[integrations.messaging.nats.resilience]
+connect_timeout_ms = 5000
+op_timeout_ms = 5000
+probe_timeout_ms = 2000
+shutdown_timeout_ms = 5000
+
+[integrations.vector.qdrant]
+enabled = false
+required = true
+host = "localhost"
+port = 6334
+use_tls = false
+
+[integrations.vector.qdrant.resilience]
+connect_timeout_ms = 5000
+op_timeout_ms = 10000
+probe_timeout_ms = 2000
+shutdown_timeout_ms = 5000
+
+[integrations.neo4j]
+enabled = false
+required = true
+uri = ""
+
+[integrations.neo4j.resilience]
+connect_timeout_ms = 5000
+op_timeout_ms = 10000
+probe_timeout_ms = 2000
+shutdown_timeout_ms = 5000
+
+[integrations.storage.s3]
+enabled = false
+required = true
+region = "us-east-1"
+use_path_style = false
+
+[integrations.storage.s3.resilience]
+connect_timeout_ms = 5000
+op_timeout_ms = 30000
+probe_timeout_ms = 2000
+shutdown_timeout_ms = 5000
+
+[integrations.oss]
+enabled = false
+required = true
+
+[integrations.oss.resilience]
+connect_timeout_ms = 5000
+op_timeout_ms = 30000
+probe_timeout_ms = 2000
+shutdown_timeout_ms = 5000
+
+[jwt]
+enabled = false
+mode = "hmac"
+clock_skew_ms = 30000
+
+[rate_limit]
+enabled = false
+limit = 100
+window_ms = 60000
+burst = 20
+key_header = ""
+
+[idempotency]
+enabled = false
+ttl_ms = 600000
+
+[circuit_breaker]
+enabled = false
+max_failures = 5
+interval_ms = 60000
+timeout_ms = 30000
+half_open_max_calls = 3
+
+[scheduler]
+enabled = false
+queue = "default"
+max_workers = 10
+drain_timeout_ms = 30000
+
+[tenant]
+enabled = false
+header_name = "X-Tenant-Id"
+claim_name = "tid"
+
+[remote]
+url = ""
+timeout_ms = 5000

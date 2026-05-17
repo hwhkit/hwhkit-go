@@ -1,0 +1,30 @@
+package main
+
+import (
+	"context"
+	"log/slog"
+	"net/http"
+	"os"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/hwhkit/hwhkit-go/config"
+	"github.com/hwhkit/hwhkit-go/core/appctx"
+	"github.com/hwhkit/hwhkit-go/hwhkit"
+)
+
+type App struct{}
+
+func (App) BuildRouter(ctx context.Context, app *appctx.Context, cfg *config.AppConfig) (http.Handler, error) {
+	r := chi.NewRouter()
+	r.Get("/hello", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("hello from {{.ProjectName}}"))
+	})
+	return r, nil
+}
+
+func main() {
+	if err := hwhkit.RunAndServe(context.Background(), App{}, config.DefaultBootstrap()); err != nil {
+		slog.Error("server failed", "err", err)
+		os.Exit(1)
+	}
+}

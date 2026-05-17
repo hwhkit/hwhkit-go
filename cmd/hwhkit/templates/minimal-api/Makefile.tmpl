@@ -1,0 +1,19 @@
+.PHONY: run build test tidy dev down
+
+run:
+	HWHKIT_ENV=dev go run .
+
+build:
+	go build -o bin/{{.ProjectName}} .
+
+test:
+	go test ./...
+
+tidy:
+	go mod tidy
+
+dev:
+	hwhkit dev --env dev
+
+down:
+	docker compose down

@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  GO_VERSION: "1.23"
+
+jobs:
+  modules-matrix:
+    strategy:
+      fail-fast: false
+      matrix:
+        module:
+          - buildinfo
+          - config
+          - core
+          - observability
+          - hwhkit
+          - tenant
+          - jwt
+          - ratelimit
+          - idempotency
+          - circuitbreaker
+          - scheduler
+          - integration/postgres
+          - integration/redis
+          - integration/s3
+          - integration/mongodb
+          - integration/nats
+          - integration/qdrant
+          - integration/neo4j
+          - integration/oss
+          - cmd/hwhkit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Tidy + build + test ${{ matrix.module }}
+        working-directory: ${{ matrix.module }}
+        run: |
+          go mod tidy
+          go vet ./...
+          go build ./...
+          go test ./...
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.61
+          working-directory: hwhkit
+
+  integration-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: hwhkit_test
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U app -d hwhkit_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Integration tests
+        working-directory: integration/postgres
+        env:
+          HWHKIT_PG_URL: postgres://app:app@127.0.0.1:5432/hwhkit_test?sslmode=disable
+        run: |
+          go mod tidy
+          go test -tags=integration ./...

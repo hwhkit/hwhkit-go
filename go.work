@@ -1,0 +1,15 @@
+go 1.23
+
+use (
+	./buildinfo
+	./circuitbreaker
+	./config
+	./core
+	./examples/minimal
+	./hwhkit
+	./idempotency
+	./jwt
+	./observability
+	./ratelimit
+	./tenant
+)

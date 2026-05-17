@@ -1,351 +1,137 @@
-# HWHKit-Go
+# hwhkit-go
 
-一个功能齐全的Go工具库，提供了Web开发中常用的各种功能模块，包括配置管理、数据库操作、缓存、认证、中间件、日志记录等。
+A production-grade Go scaffolding library mirroring [hwhkit-rs](https://github.com/hwhkit/hwhkit-rs) architecture: one-call OOTB entry, Tier-1 production defaults, pluggable integrations.
 
-## 特性
+> **Status:** v0.1.0-alpha — pre-1.0. The API surface is stable enough for early adopters, but minor versions may still introduce breaking changes until v1.0.0.
 
-- 🔧 **配置管理**: 支持环境变量和远程配置
-- 🗄️ **数据库支持**: MySQL, PostgreSQL with GORM
-- 🚀 **缓存支持**: Redis with connection pooling
-- 🔐 **JWT认证**: 完整的JWT令牌管理
-- 🌐 **HTTP服务器**: 基于Gin的HTTP服务器封装
-- 🛡️ **中间件**: CORS, 认证, 日志, 限流等
-- 📝 **日志管理**: 基于logrus的结构化日志
-- 🔨 **工具函数**: 字符串, JSON, 时间, HTTP等工具
-
-## 快速开始
-
-### 安装
+## Quick start
 
 ```bash
-go mod init your-project
-go get github.com/hwh/hwhkit-go
+go install github.com/hwhkit/hwhkit-go/cmd/hwhkit@latest
+hwhkit init my-service
+cd my-service
+go mod tidy
+go run .
 ```
 
-### 基本使用
+In your `main.go`:
 
 ```go
 package main
 
 import (
-    "github.com/hwh/hwhkit-go/pkg/config"
-    "github.com/hwh/hwhkit-go/pkg/logger"
-    "github.com/hwh/hwhkit-go/pkg/server"
+    "context"
+    "log/slog"
+    "net/http"
+    "os"
+
+    "github.com/go-chi/chi/v5"
+    "github.com/hwhkit/hwhkit-go/config"
+    "github.com/hwhkit/hwhkit-go/core/appctx"
+    "github.com/hwhkit/hwhkit-go/hwhkit"
+    "github.com/hwhkit/hwhkit-go/integration/postgres"
+    "github.com/hwhkit/hwhkit-go/integration/redis"
 )
+
+type App struct{}
+
+func (App) BuildRouter(ctx context.Context, app *appctx.Context, cfg *config.AppConfig) (http.Handler, error) {
+    pg, _ := appctx.Get[postgres.Handle](app)
+    r := chi.NewRouter()
+    r.Get("/users", listUsers(pg.Pool()))
+    return r, nil
+}
 
 func main() {
-    // 创建配置管理器
-    configManager := config.New()
-    cfg := configManager.Get()
-    
-    // 创建日志管理器
-    logManager, _ := logger.New(configManager.GetLog())
-    
-    // 创建服务器
-    serverConfig := &server.ServerConfig{
-        Config: cfg,
-        Logger: logManager,
+    err := hwhkit.RunAndServe(context.Background(), App{}, config.DefaultBootstrap(),
+        hwhkit.WithProvider(postgres.NewProvider()),
+        hwhkit.WithProvider(redis.NewProvider()),
+    )
+    if err != nil {
+        slog.Error("server failed", "err", err)
+        os.Exit(1)
     }
-    
-    httpServer, _ := server.New(serverConfig)
-    
-    // 添加路由
-    httpServer.GET("/hello", func(c *gin.Context) {
-        c.JSON(200, gin.H{"message": "Hello, World!"})
-    })
-    
-    // 启动服务器
-    httpServer.StartWithGracefulShutdown()
 }
 ```
 
-## 模块详解
+That's it. You get:
 
-### 1. 配置管理 (Config)
+- `GET /health` — liveness
+- `GET /health/ready` — readiness (probes every initialised integration concurrently)
+- `GET /metrics` — Prometheus exposition (process + Go runtime + HTTP RED)
+- `GET /version` — git SHA / build time / Go version
+- `GET /info` — applied config sources + integration state
+- Standard middleware: request-id (UUIDv7), panic-recover → RFC 7807 problem+json, access log, CORS, gzip/br compression, body limit, timeout, sensitive-header redaction, HTTP metrics
+- Graceful shutdown: SIGTERM → drain → reverse-order provider shutdown
 
-支持从环境变量和.env文件加载配置，也支持远程配置API。
+## Modules
 
-```go
-// 基本使用
-configManager := config.New()
-cfg := configManager.Get()
+| Module | What it provides |
+|---|---|
+| `hwhkit-go/hwhkit` | Facade: `RunAndServe`, `Run`, options |
+| `hwhkit-go/core` | `Application`, `IntegrationProvider`, `AppContext`, bootstrap pipeline |
+| `hwhkit-go/config` | Layered config loader (`default → env → ENV(HWHKIT__) → remote`) |
+| `hwhkit-go/observability` | slog, prometheus, OTLP, instrumentation adapters |
+| `hwhkit-go/buildinfo` | ldflags-injected version metadata |
+| `hwhkit-go/integration/postgres` | pgx v5 pool, otelpgx tracer |
+| `hwhkit-go/integration/redis` | go-redis v9 + redisotel |
+| `hwhkit-go/integration/mongodb` | mongo-driver |
+| `hwhkit-go/integration/nats` | nats.go + jetstream |
+| `hwhkit-go/integration/qdrant` | qdrant-go-client |
+| `hwhkit-go/integration/neo4j` | neo4j-go-driver v5 |
+| `hwhkit-go/integration/s3` | aws-sdk-go-v2 |
+| `hwhkit-go/integration/oss` | aliyun OSS |
+| `hwhkit-go/jwt` | JWKS (lestrrat-go/jwx) + HMAC verifier + middleware |
+| `hwhkit-go/ratelimit` | Redis token-bucket middleware |
+| `hwhkit-go/idempotency` | `Idempotency-Key` header middleware (redis) |
+| `hwhkit-go/circuitbreaker` | sony/gobreaker v2 `http.RoundTripper` wrapper |
+| `hwhkit-go/scheduler` | wraps riverqueue/river (durable PG-backed cron + one-shot) |
+| `hwhkit-go/tenant` | `TenantID`, `Scope[T]`, extractor middleware |
+| `hwhkit-go/cmd/hwhkit` | CLI: `init`, `migrate {create,up,down,version,force}`, `dev`, `version` |
 
-// 使用远程配置
-configManager := config.NewWithURL("https://config-api.example.com/config")
+## Config
+
+Layering order (later wins):
+
+1. Embedded `default.toml` (built into `config` module)
+2. `config/{env}.toml` from filesystem
+3. ENV vars with `HWHKIT__` prefix; `__` separator becomes dot
+   (e.g. `HWHKIT__SERVER__BIND_ADDR=0.0.0.0:8080`)
+4. Optional remote HTTP patch (if `cfg.Remote.URL` is set)
+
+`cfg.AppliedSources()` lists every contributing source, in order — surfaced on `/info`.
+
+## OOTB endpoints
+
+Every service mounted with `hwhkit.RunAndServe` gets these for free:
+
+```
+GET /health         → 200 {"status":"healthy"}
+GET /health/ready   → 200 / 503 with per-check results
+GET /metrics        → Prometheus exposition
+GET /version        → {"version", "git_sha", "build_time", "go_version"}
+GET /info           → version + applied_sources + initialized/degraded integrations
 ```
 
-**支持的配置项:**
-- 服务器配置 (端口, 模式, 超时等)
-- 数据库配置 (MySQL, PostgreSQL)
-- Redis配置
-- JWT配置
-- 日志配置
-
-### 2. 日志管理 (Logger)
-
-基于logrus的结构化日志管理，支持多种输出格式和目标。
+## Tier-2 capabilities (opt-in by import)
 
 ```go
-// 创建日志管理器
-logManager, err := logger.New(&config.LogConfig{
-    Level:  "info",
-    Format: "json",
-    Output: "both", // console, file, both
-})
-
-// 使用日志
-logManager.Info("Application started")
-logManager.WithFields(logger.Fields{
-    "user_id": 123,
-    "action":  "login",
-}).Info("User logged in")
-
-// 错误日志
-logManager.WithError(err).Error("Database connection failed")
-```
-
-### 3. 数据库管理 (Database)
-
-基于GORM的数据库管理，支持MySQL和PostgreSQL。
-
-```go
-// 创建数据库管理器
-dbManager, err := database.New(&config.DatabaseConfig{
-    Type:     "mysql",
-    Host:     "localhost",
-    Port:     3306,
-    User:     "root",
-    Password: "password",
-    Name:     "myapp",
-})
-
-// 获取GORM实例
-db := dbManager.GetDB()
-
-// 自动迁移
-dbManager.Migrate(&User{}, &Post{})
-
-// 事务操作
-err := dbManager.Transaction(func(tx *gorm.DB) error {
-    // 事务内的操作
-    return nil
-})
-```
-
-### 4. 缓存管理 (Cache)
-
-Redis缓存管理，支持连接池和各种数据类型操作。
-
-```go
-// 创建缓存管理器
-cacheManager, err := cache.New(&config.RedisConfig{
-    Host:     "localhost",
-    Port:     6379,
-    Password: "",
-    DB:       0,
-})
-
-// 基本操作
-cacheManager.Set("key", "value", time.Hour)
-value, err := cacheManager.Get("key")
-
-// JSON操作
-cacheManager.SetJSON("user:123", user, time.Hour)
-var user User
-err := cacheManager.GetJSON("user:123", &user)
-
-// 列表操作
-cacheManager.LPush("queue", "item1", "item2")
-item, err := cacheManager.RPop("queue")
-```
-
-### 5. JWT认证 (Auth)
-
-完整的JWT令牌管理系统。
-
-```go
-// 创建认证管理器
-authManager := auth.New(&config.JWTConfig{
-    Secret:       "your-secret-key",
-    ExpireHours:  24,
-    RefreshHours: 168,
-    Issuer:       "your-app",
-})
-
-// 生成令牌对
-tokenPair, err := authManager.GenerateTokenPair(
-    userID,
-    username,
-    email,
-    role,
+import (
+    "github.com/hwhkit/hwhkit-go/jwt"
+    "github.com/hwhkit/hwhkit-go/ratelimit"
+    "github.com/hwhkit/hwhkit-go/idempotency"
+    "github.com/hwhkit/hwhkit-go/circuitbreaker"
+    "github.com/hwhkit/hwhkit-go/scheduler"
+    "github.com/hwhkit/hwhkit-go/tenant"
 )
-
-// 验证令牌
-claims, err := authManager.ValidateToken(token)
-
-// 刷新令牌
-newTokenPair, err := authManager.RefreshToken(refreshToken)
 ```
 
-### 6. 中间件 (Middleware)
+Each is its own Go module — `go.sum` only lists what you actually use.
 
-提供各种Gin中间件。
+## Why split into separate modules?
 
-```go
-import "github.com/hwh/hwhkit-go/pkg/middleware"
+Go has no compile-time feature flags like Cargo. Splitting each integration into its own module gives users the same opt-in property — pulling `hwhkit-go/integration/postgres` brings in pgx; not pulling it leaves `go.sum` free of pgx and its deps.
 
-// CORS中间件
-engine.Use(middleware.CORS())
+## License
 
-// JWT认证中间件
-engine.Use(middleware.JWTWithManager(authManager))
-
-// 日志中间件
-engine.Use(middleware.LoggerWithManager(logManager))
-
-// 限流中间件
-engine.Use(middleware.RateLimitByIP(100, 10)) // 100 req/s, burst 10
-
-// 角色验证
-adminRoutes := engine.Group("/admin")
-adminRoutes.Use(middleware.RequireRole(authManager, "admin"))
-```
-
-### 7. HTTP服务器 (Server)
-
-基于Gin的HTTP服务器封装。
-
-```go
-// 创建服务器
-serverConfig := &server.ServerConfig{
-    Config:   cfg,
-    Logger:   logManager,
-    Database: dbManager,
-    Cache:    cacheManager,
-    Auth:     authManager,
-}
-
-httpServer, err := server.New(serverConfig)
-
-// 设置API路由
-apiRouter := server.NewAPIRouter(httpServer)
-apiRouter.SetupV1API()
-
-// 添加自定义路由
-httpServer.GET("/custom", handler)
-
-// 路由组
-api := httpServer.Group("/api")
-api.GET("/users", getUsersHandler)
-
-// 启动服务器
-httpServer.StartWithGracefulShutdown()
-```
-
-### 8. 工具函数 (Utils)
-
-提供各种常用工具函数。
-
-```go
-import "github.com/hwh/hwhkit-go/pkg/utils"
-
-// 字符串工具
-utils.Str.CamelCase("hello_world")    // "helloWorld"
-utils.Str.SnakeCase("HelloWorld")     // "hello_world"
-utils.Str.RandomString(10)            // 随机字符串
-
-// JSON工具
-jsonStr, _ := utils.JSON.ToPrettyJSON(data)
-utils.JSON.FromJSON(jsonStr, &result)
-
-// 时间工具
-utils.Time.FormatNowDateTime()        // "2023-12-25 10:30:45"
-utils.Time.AddDays(time.Now(), 7)     // 7天后
-
-// HTTP工具
-resp, err := utils.HTTP.Get("https://api.example.com", headers)
-```
-
-## 环境配置
-
-复制 `.env.example` 到 `.env` 并根据需要修改配置:
-
-```bash
-cp .env.example .env
-```
-
-主要配置项：
-
-```env
-# 服务器
-SERVER_PORT=8080
-SERVER_MODE=debug
-
-# 数据库
-DB_TYPE=mysql
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=myapp
-
-# Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
-
-# JWT
-JWT_SECRET=your-secret-key
-```
-
-## API文档
-
-### 健康检查
-
-- `GET /health` - 整体健康状态
-- `GET /health/live` - 存活检查
-- `GET /health/ready` - 就绪检查
-
-### 认证 API
-
-- `POST /api/v1/auth/login` - 用户登录
-- `POST /api/v1/auth/register` - 用户注册
-- `POST /api/v1/auth/refresh` - 刷新令牌
-- `POST /api/v1/auth/logout` - 用户登出
-
-### 用户 API
-
-- `GET /api/v1/user/profile` - 获取用户资料
-- `PUT /api/v1/user/profile` - 更新用户资料
-
-### 管理员 API
-
-- `GET /api/v1/admin/users` - 获取用户列表
-- `GET /api/v1/admin/stats` - 获取统计信息
-
-## 项目结构
-
-```
-hwhkit-go/
-├── pkg/                    # 核心包
-│   ├── auth/              # JWT认证
-│   ├── cache/             # Redis缓存
-│   ├── config/            # 配置管理
-│   ├── database/          # 数据库管理
-│   ├── logger/            # 日志管理
-│   ├── middleware/        # Gin中间件
-│   ├── server/            # HTTP服务器
-│   └── utils/             # 工具函数
-├── examples/              # 示例代码
-│   └── basic/            # 基本使用示例
-├── tests/                 # 测试文件
-├── docs/                  # 文档
-├── go.mod
-├── go.sum
-└── README.md
-```
-
-## 贡献
-
-欢迎提交Issue和Pull Request！
-
-## 许可证
-
-MIT License
+Dual-licensed under MIT and Apache-2.0 (matches hwhkit-rs).
