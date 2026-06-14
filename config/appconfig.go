@@ -65,6 +65,41 @@ type IntegrationsConfig struct {
 	Neo4j     Neo4jConfig     `koanf:"neo4j"`
 	Storage   StorageConfig   `koanf:"storage"`
 	OSS       OSSConfig       `koanf:"oss"`
+	LLM       LLMConfig       `koanf:"llm"`
+}
+
+// LLMConfig is the `[integrations.llm]` section. Consumed by the
+// integration/llm package.
+type LLMConfig struct {
+	Enabled               bool             `koanf:"enabled"`
+	Required              bool             `koanf:"required"`
+	DefaultChatModel      string           `koanf:"default_chat_model"`
+	DefaultEmbeddingModel string           `koanf:"default_embedding_model"`
+	DefaultTemperature    float32          `koanf:"default_temperature"`
+	DefaultMaxTokens      int              `koanf:"default_max_tokens"`
+	Resilience            ResilienceConfig `koanf:"resilience"`
+	Providers             LLMProviders     `koanf:"providers"`
+}
+
+// LLMProviders bundles per-backend credentials. Each is independent.
+type LLMProviders struct {
+	Anthropic LLMProviderCreds `koanf:"anthropic"`
+	OpenAI    LLMProviderCreds `koanf:"openai"`
+	DeepSeek  LLMProviderCreds `koanf:"deepseek"`
+	Moonshot  LLMProviderCreds `koanf:"moonshot"`
+	Ollama    LLMProviderCreds `koanf:"ollama"`
+}
+
+// LLMProviderCreds is one backend's credentials. Empty APIKey + empty
+// BaseURL means "not configured" — skip this backend at bootstrap.
+type LLMProviderCreds struct {
+	APIKey  string `koanf:"api_key"`
+	BaseURL string `koanf:"base_url"`
+}
+
+// IsConfigured reports whether the operator set either field.
+func (c LLMProviderCreds) IsConfigured() bool {
+	return c.APIKey != "" || c.BaseURL != ""
 }
 
 type ResilienceConfig struct {

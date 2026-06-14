@@ -8,6 +8,7 @@ use (
 	./examples/minimal
 	./hwhkit
 	./idempotency
+	./integration/llm
 	./jwt
 	./observability
 	./ratelimit
