@@ -2,6 +2,32 @@
 
 All notable changes to hwhkit-go are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.0] - 2026-08-16
+
+### Added
+
+- **`integration/llm`** — multi-provider LLM integration: a `*Handle` that
+  multiplexes `Chat` / `ChatStream` / `Embed` across backends by model prefix
+  (`anthropic/...`, `openai/...`, `deepseek/...`, `moonshot/...`, `ollama/...`).
+  `Backend` interface with `AnthropicBackend` + `OpenAICompatBackend`
+  implementations, streaming over `<-chan StreamChunk`, and typed
+  `*llm.Error{Kind, Backend, Status, Message, Cause}`. Includes an
+  `IntegrationProvider` for one-call bootstrap wiring.
+- **`apiresponse`** — zero-dep stdlib-only `ApiResponse[T]` envelope
+  (`{code, message, data, trace_id}`) with `OK` / `Err` / `WithTraceID`
+  constructors and `Data *T` for distinct "no data" vs zero-value semantics.
+  Matches the hwhkit-rs `ApiResponse<T>` and hwhkit-py contract.
+
+### Changed
+
+- **Complete Go workspace.** `go.work` now lists every module in the repo
+  (all 8 integrations, `scheduler`, `cmd/hwhkit`, `examples/full-stack`,
+  etc.) instead of a partial subset, so `go build`/`go test` from the
+  workspace cover the whole surface.
+- **Normalized `go` directive.** `integration/oss/go.mod` dropped its stray
+  `go 1.25.0` (the only module out of step) to `go 1.23`, matching the rest
+  of the workspace and CI.
+
 ## [0.1.0-alpha] - 2026-05-17
 
 Initial public release. Architectural parity with [hwhkit-rs 0.6.0-alpha.1](https://github.com/hwhkit/hwhkit-rs).

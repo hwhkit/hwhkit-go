@@ -4,14 +4,25 @@ use (
 	./apiresponse
 	./buildinfo
 	./circuitbreaker
+	./cmd/hwhkit
 	./config
 	./core
+	./examples/full-stack
 	./examples/minimal
 	./hwhkit
 	./idempotency
 	./integration/llm
+	./integration/mongodb
+	./integration/nats
+	./integration/neo4j
+	./integration/oss
+	./integration/postgres
+	./integration/qdrant
+	./integration/redis
+	./integration/s3
 	./jwt
 	./observability
 	./ratelimit
+	./scheduler
 	./tenant
 )
